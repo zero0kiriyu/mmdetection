@@ -6,8 +6,8 @@ _base_ = [
 max_epochs = 280
 
 custom_imports=dict(imports=[
-    'mmcls.models',
-    'projects.nanodet.nanodet',
+    'projects.nanodet.nanodet.models.backbone.shufflenetv2',
+    'projects.nanodet.nanodet.models.dense_heads.nanodet_head'
 ], allow_failed_imports=False) 
 
 model = dict(
@@ -19,14 +19,10 @@ model = dict(
         bgr_to_rgb=False,
         pad_size_divisor=32),
     backbone=dict(
-        type='mmcls.ShuffleNetV2',
-        widen_factor=1.0, # ShuffleNetV2 x1.0
-        out_indices=(2, 3, 4),
-        frozen_stages=-1,
-        norm_cfg=dict(type='BN', requires_grad=True),
-        act_cfg=dict(type="LeakyReLU"),
-        norm_eval=False,
-        with_cp=False,
+        type="ShuffleNetV2",
+        model_size="1.0x",
+        out_stage=[2,3,4],
+        activateion='LeakyReLU',
     ),
     neck=dict(
         type='PAFPN',
@@ -35,7 +31,7 @@ model = dict(
         start_level=0,
         num_outs=3),
     bbox_head=dict(
-        type='nanodet.NanoDetHead',
+        type='NanoDetHead',
         num_classes=80,
         in_channels=96,
         stacked_convs=2,
@@ -91,11 +87,11 @@ param_scheduler = [
 
 train_cfg = dict(max_epochs=max_epochs, val_interval=10)
 
-
+file_client_args = dict(backend='dick')
 train_pipeline = [
     dict(
         type='LoadImageFromFile',
-        file_client_args={{_base_.file_client_args}}),
+        file_client_args=file_client_args),
     dict(type='LoadAnnotations', with_bbox=True),
     dict(type='RandomAffine',
         max_rotate_degree=0,
@@ -109,16 +105,15 @@ train_pipeline = [
         prob=0.5
     ),
     dict(
+        type='Resize', scale=(320, 320),
+        keep_ratio=True),
+    dict(
         type='PhotoMetricDistortion',
         brightness_delta=51,
         contrast_range=(0.6, 1.4),
         saturation_range=(0.5, 1.2),
         hue_delta=0
     ),
-    dict(
-        type='Resize', scale=(320, 320),
-        keep_ratio=True),
-    dict(type='RandomFlip', prob=0.5),
     dict(
         type='PackDetInputs',
         meta_keys=('img_id', 'img_path', 'ori_shape', 'img_shape',
@@ -134,7 +129,7 @@ train_dataloader = dict(
 )
 
 test_pipeline = [
-    dict(type='LoadImageFromFile', file_client_args={_base_.file_client_args}),
+    dict(type='LoadImageFromFile', file_client_args=file_client_args),
     dict(type='Resize', scale=(320, 320), keep_ratio=True),
     dict(type='LoadAnnotations', with_bbox=True),
     dict(
